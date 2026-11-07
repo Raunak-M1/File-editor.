@@ -1,1 +1,60 @@
 
+name: Build File Editor APK
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Extract Android project
+        run: |
+          unzip -q File_editor_Android_Studio_Project.zip -d project
+
+      - name: Add required dependency
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("project/app/build.gradle.kts")
+          s = p.read_text()
+          dependency = 'implementation("androidx.documentfile:documentfile:1.0.1")'
+
+          if dependency not in s:
+              s = s.replace(
+                  'implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")',
+                  dependency + '\n    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")'
+              )
+              p.write_text(s)
+          PY
+
+      - name: Build APK
+        run: gradle -p project assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: File-Editor-APK
+          path: project/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          
